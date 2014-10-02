@@ -55,13 +55,9 @@
         } else {
           daemon = daemons[name];
           if ( daemon ) {
-
-              setTimeout(function() {
-                grunt.log.debug('Stopping ' + daemon.proc.pid );
-                daemon.proc.stdin.end();
-                daemon.proc.kill( 'SIGHUP' );
-                setTimeout(done, 5000);
-              }, 3000);
+            grunt.log.debug('Stopping ' + daemon.proc.pid );
+            daemon.proc.kill( 'SIGINT' );
+            grunt.log.ok(util.format("%s %s", 'Stopped', name));
           } else {
             done();  
           }
