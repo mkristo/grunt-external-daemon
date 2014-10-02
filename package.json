@@ -28,6 +28,7 @@
     "test": "grunt"
   },
   "dependencies": {
+    "tail": "^0.4.0",
     "underscore": "~> 1.4.4"
   },
   "devDependencies": {

@@ -13,9 +13,11 @@
   var path  = require('path'),
       fs    = require('fs'),
       util  = require('util'),
-      _     = require('underscore');
+      _     = require('underscore'),
+      Tail  = require('tail').Tail,
+      daemons = {};
 
-  grunt.registerMultiTask('external_daemon', 'Launch external long-running background processes', function () {
+  grunt.registerMultiTask('external_daemon', 'Launch external long-running background processes', function ( arg1 ) {
     var done = this.async();
     var options = this.options({
       verbose: false,
@@ -29,10 +31,13 @@
     var cmd = this.data.cmd;
     var args = this.data.args || [];
     var startedEventName = 'external:'+this.target+':started';
+    var stoppedEventName = 'external:'+this.target+':stopped';
+    var eventName;
     var checkIntervalTime = (options.startCheckInterval * 1000),
         failTimeoutTime   = (options.startCheckTimeout * 1000);
     var logFunc = (options.verbose) ? grunt.log.write : grunt.verbose.write;
-    var proc, failTimeoutHandle, checkIntervalHandle, stdout = [], stderr = [];
+    var proc, daemon, tail, failTimeoutHandle, checkIntervalHandle,
+        stopping = false, stdout = [], stderr = [];
     var handleSig = function () { 
       proc.kill(options.killSignal); 
 
@@ -40,6 +45,31 @@
         done();
       }
     };
+
+    if ( arg1 === 'stop' ) {
+        if ( this.data.stopCmd ) {
+          cmd = this.data.stopCmd;
+          args = this.data.stopArgs,
+          options.startCheck = options.stopCheck;
+          stopping = true;
+        } else {
+          daemon = daemons[name];
+          if ( daemon ) {
+
+              setTimeout(function() {
+                grunt.log.debug('Stopping ' + daemon.proc.pid );
+                daemon.proc.stdin.end();
+                daemon.proc.kill( 'SIGHUP' );
+                setTimeout(done, 5000);
+              }, 3000);
+          } else {
+            done();  
+          }
+          return;
+        }
+    }
+
+    eventName = stopping ? stoppedEventName : startedEventName;
 
     // Make sure we don't leave behind any dangling processes.
     process.on('exit', handleSig);
@@ -80,6 +110,10 @@
       grunt.log.warn(util.format("Command %s exited with status code %s", cmd, code));
     });
 
+    daemons[name] = {
+      proc: proc
+    };
+
     proc.stdout.setEncoding('utf-8');
     proc.stderr.setEncoding('utf-8');
 
@@ -102,11 +136,24 @@
       }
     });
 
-    grunt.event.on(startedEventName, function() {
+    if (options.logFile) {
+      tail = new Tail(options.logFile, null, {}, false);
+      tail.on('line', function(data) {
+        stdout.push(data);
+        logFunc(util.format("[%s LOG] %s\n", cmd, data));
+      });
+      grunt.event.on(eventName, function(targetName) {
+        if (name == targetName) {
+          tail.unwatch();
+        }
+      });
+    }
+
+    grunt.event.on(eventName, function() {
       clearTimeout(failTimeoutHandle);
       clearInterval(checkIntervalHandle);
 
-      grunt.log.ok(util.format("Started %s", name));
+      grunt.log.ok(util.format("%s %s", stopping ? 'Stopped' : 'Started', name));
       
       done();
     });
@@ -123,7 +170,7 @@
     // Start the check interval.
     checkIntervalHandle = setInterval(function() {
       if (options.startCheck(stdout.join(), stderr.join())) {
-        grunt.event.emit(startedEventName);
+        grunt.event.emit(eventName, name);
       }
     }, checkIntervalTime);
   });
