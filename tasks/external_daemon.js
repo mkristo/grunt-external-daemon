@@ -15,12 +15,13 @@
       util  = require('util'),
       _     = require('underscore'),
       Tail  = require('tail').Tail,
+      shelljs = require('shelljs'),
       daemons = {};
 
   grunt.registerMultiTask('external_daemon', 'Launch external long-running background processes', function ( arg1 ) {
     var done = this.async();
     var options = this.options({
-      verbose: false,
+      verbose: !!grunt.option('verbose'),
       nodeSpawnOptions: {},
       startCheck: function() { return true; },
       startCheckInterval: 0.5,
@@ -30,6 +31,8 @@
     var name = this.target;
     var cmd = this.data.cmd;
     var args = this.data.args || [];
+    var stopCmd = this.data.stopCmd;
+    var stopArgs = this.data.stopArgs;
     var startedEventName = 'external:'+this.target+':started';
     var stoppedEventName = 'external:'+this.target+':stopped';
     var eventName;
@@ -39,7 +42,13 @@
     var proc, daemon, tail, failTimeoutHandle, checkIntervalHandle,
         stopping = false, stdout = [], stderr = [];
     var handleSig = function () { 
-      proc.kill(options.killSignal); 
+      proc.kill(options.killSignal);
+
+      if (stopCmd) {
+        grunt.log.ok('Stopping ' + name);
+        shelljs.exec(stopCmd + ' ' + stopArgs.join(' '), { silent: !options.verbose });
+        grunt.log.ok('Stopped ' + name);
+      }
 
       if (typeof done === 'function') {
         done();
@@ -47,9 +56,9 @@
     };
 
     if ( arg1 === 'stop' ) {
-        if ( this.data.stopCmd ) {
-          cmd = this.data.stopCmd;
-          args = this.data.stopArgs,
+        if ( stopCmd ) {
+          cmd = stopCmd;
+          args = stopArgs,
           options.startCheck = options.stopCheck;
           stopping = true;
         } else {
