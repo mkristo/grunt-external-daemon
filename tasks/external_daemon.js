@@ -41,7 +41,8 @@
     var logFunc = (options.verbose) ? grunt.log.write : grunt.verbose.write;
     var proc, daemon, tail, failTimeoutHandle, checkIntervalHandle,
         stopping = false, stdout = [], stderr = [];
-    var handleSig = function () { 
+    var handleSig = function () {
+      grunt.log.ok('Stopping ' + name );
       proc.kill(options.killSignal);
 
       if (stopCmd) {
@@ -64,8 +65,8 @@
         } else {
           daemon = daemons[name];
           if ( daemon ) {
-            grunt.log.debug('Stopping ' + daemon.proc.pid );
-            daemon.proc.kill( 'SIGINT' );
+            grunt.log.ok('Stopping ' + name );
+            daemon.proc.kill( options.killSignal );
             grunt.log.ok(util.format("%s %s", 'Stopped', name));
           } else {
             done();  
