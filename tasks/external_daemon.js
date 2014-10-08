@@ -42,12 +42,15 @@
     var proc, daemon, tail, failTimeoutHandle, checkIntervalHandle,
         stopping = false, stdout = [], stderr = [];
     var handleSig = function () {
-      grunt.log.ok('Stopping ' + name );
-      proc.kill(options.killSignal);
+      daemon = daemons[name];
 
-      if (stopCmd) {
+      if (!daemon.stopped) {
         grunt.log.ok('Stopping ' + name);
-        shelljs.exec(stopCmd + ' ' + stopArgs.join(' '), { silent: !options.verbose });
+        if (stopCmd) {
+          shelljs.exec(stopCmd + ' ' + stopArgs.join(' '), { silent: !options.verbose });
+        } else {
+          proc.kill(options.killSignal);
+        }
         grunt.log.ok('Stopped ' + name);
       }
 
@@ -57,22 +60,24 @@
     };
 
     if ( arg1 === 'stop' ) {
-        if ( stopCmd ) {
-          cmd = stopCmd;
-          args = stopArgs,
-          options.startCheck = options.stopCheck;
-          stopping = true;
-        } else {
-          daemon = daemons[name];
-          if ( daemon ) {
-            grunt.log.ok('Stopping ' + name );
-            daemon.proc.kill( options.killSignal );
-            grunt.log.ok(util.format("%s %s", 'Stopped', name));
-          } else {
-            done();  
-          }
-          return;
-        }
+      daemon = daemons[name];
+      if (daemon.stopped) {
+        done();
+        return
+      }
+      grunt.log.ok('Stopping ' + name );
+      if ( stopCmd ) {
+        cmd = stopCmd;
+        args = stopArgs,
+        options.startCheck = options.stopCheck;
+        stopping = true;
+      } else {
+        daemon.proc.kill( options.killSignal );
+        grunt.log.ok('Stopped ' + name);
+        daemon.stopped = true;
+        done();
+        return;
+      }
     }
 
     eventName = stopping ? stoppedEventName : startedEventName;
@@ -116,9 +121,13 @@
       grunt.log.debug(util.format("Command %s exited with status code %s", cmd, code));
     });
 
-    daemons[name] = {
-      proc: proc
-    };
+    if (!stopping) {
+      grunt.log.ok('Starting ' + name);
+      daemons[name] = {
+        proc: proc,
+        stopped: false
+      };
+    }
 
     proc.stdout.setEncoding('utf-8');
     proc.stderr.setEncoding('utf-8');
@@ -160,6 +169,9 @@
       clearInterval(checkIntervalHandle);
 
       grunt.log.ok(util.format("%s %s", stopping ? 'Stopped' : 'Started', name));
+      if (stopping) {
+        daemons[name].stopped = true;
+      }
       
       done();
     });
