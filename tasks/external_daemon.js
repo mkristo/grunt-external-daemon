@@ -103,8 +103,8 @@
       args: args,
       opts: options.nodeSpawnOptions
     }, function (error, result, code) {
-      grunt.verbose.write(util.format("[%s STDOUT] %s"), cmd, result.stdout);
-      grunt.verbose.write(util.format("[%s STDERR] %s"), cmd, result.stderr);
+      // grunt.verbose.write(util.format("[%s STDOUT] %s\n"), cmd, result.stdout);
+      // grunt.verbose.write(util.format("[%s STDERR] %s\n"), cmd, result.stderr);
 
       if (typeof options.stdout === 'number') {
         fs.closeSync(options.stdout);
@@ -113,7 +113,7 @@
         fs.closeSync(options.stderr);
       }
 
-      grunt.log.warn(util.format("Command %s exited with status code %s", cmd, code));
+      grunt.log.debug(util.format("Command %s exited with status code %s", cmd, code));
     });
 
     daemons[name] = {
