@@ -16,6 +16,7 @@
       _     = require('underscore'),
       Tail  = require('tail').Tail,
       shelljs = require('shelljs'),
+      treekill = require('tree-kill'),
       daemons = {};
 
   grunt.registerMultiTask('external_daemon', 'Launch external long-running background processes', function ( arg1 ) {
@@ -49,7 +50,7 @@
         if (stopCmd) {
           shelljs.exec(stopCmd + ' ' + stopArgs.join(' '), { silent: !options.verbose });
         } else {
-          proc.kill(options.killSignal);
+          treekill(proc.pid, options.killSignal);
         }
         grunt.log.ok('Stopped ' + name);
       }
@@ -68,11 +69,11 @@
       grunt.log.ok('Stopping ' + name );
       if ( stopCmd ) {
         cmd = stopCmd;
-        args = stopArgs,
+        args = stopArgs;
         options.startCheck = options.stopCheck;
         stopping = true;
       } else {
-        daemon.proc.kill( options.killSignal );
+        treekill(daemon.proc.pid, options.killSignal);
         grunt.log.ok('Stopped ' + name);
         daemon.stopped = true;
         done();
@@ -179,7 +180,7 @@
     // If timeout check is set to false instead of a number, disable the timeout.
     if (options.startCheckTimeout !== false) {
       failTimeoutHandle = setTimeout(function() {
-        proc.kill('SIGHUP');
+        treekill(proc.pid, 'SIGHUP');
         clearInterval(checkIntervalHandle);
         grunt.fail.fatal(util.format("Command timed out: %s", cmd));
       }, failTimeoutTime);
